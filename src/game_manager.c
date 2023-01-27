@@ -2,37 +2,15 @@
 #include <stdio.h>
 #include "../headers/game_manager.h"
 
-const uint64_t BIT_ONE = (uint64_t) 0b1;
-const uint64_t TURN_BIT = BIT_ONE<<62;
-const uint64_t WIN_BIT = BIT_ONE<<61;
+const grid_t BIT_ONE = (grid_t) 0b1;
+const grid_t TURN_BIT = BIT_ONE<<62;
+const grid_t WIN_BIT = BIT_ONE<<61;
 
-game_t* game_init(int8_t starting_player) {
-    // Preliminary checks
-    if (starting_player != PLAYER_A && starting_player != PLAYER_B) return NULL;
-
-    game_t* g_ptr = (game_t*) malloc(sizeof(game_t));
-    if (g_ptr == NULL) return NULL;
-    /*char* cols_occ = (char*) calloc(7, sizeof(char));
-    if (cols_occ == NULL) return NULL;
-    g_ptr->cols_occupation = cols_occ;*/
-    *get_player_grid(g_ptr, starting_player) = TURN_BIT;
-    g_ptr->gridA = TURN_BIT;
-    return g_ptr;
-}
-
-
-void game_destroy(game_t* game) { free(game); }
-
-
-int8_t winner(game_t* game) {
-    // Preliminary checks
-    if (game == NULL) return ARG_ERROR;
-
-    if (game->gridA & WIN_BIT) return PLAYER_A;
-    if (game->gridB & WIN_BIT) return PLAYER_B;
-    return -1;
-}
-
+/*
+===========================================
+============= HELPER FUNCTIONS ============
+===========================================
+*/
 
 /**
  * Returns the grid associated to a player in a game.
@@ -42,14 +20,15 @@ int8_t winner(game_t* game) {
  * 
  * @return the grid in 'game' that contains the information relative to 'player'
 */
-uint64_t* get_player_grid(game_t* game, int8_t player) {
+static grid_t* get_player_grid(game_t* game, player_t player) {
     return (player == PLAYER_A) ? &(game->gridA) : &(game->gridB);
 }
 
 
-uint64_t is_their_turn_to_play(game_t* game, uint64_t player_grid) {
-    return player_grid & TURN_BIT;
+static boolean is_their_turn_to_play(game_t* game, grid_t player_grid) {
+    return (player_grid & TURN_BIT)>>TURN_BIT;
 }
+
 
 /**
  * Computes the offset of the bit that corresponds to the coordinates (col, row) in the grid
@@ -57,9 +36,10 @@ uint64_t is_their_turn_to_play(game_t* game, uint64_t player_grid) {
  * @param col Index of the column. Contained in [0, 6]
  * @param row Index of the row. Contained in [0, 5]. 
  */
-int8_t compute_offset(int8_t col, int8_t row) {
+static int8_t compute_offset(col_t col, int8_t row) {
     return (1+row)*ROW_LENGTH - col - 1;
 }
+
 
 /**
  * Checks if the addition of the latest added disk creates a Connect-4.
@@ -69,9 +49,9 @@ int8_t compute_offset(int8_t col, int8_t row) {
  * @param col the column (0-6) on which the latest disk was played
  * @param player_grid the grid of the player that added the disk. Includes the latest added disk.
  * 
- * @return 1 if the new disk creates a Connect-4, and 0 otherwise
+ * @return 1 if the new disk creates a Connect-4; 0 otherwise
 */
-char makes_new_connect4(game_t* game, int8_t col, uint64_t player_grid) {
+static boolean makes_new_connect4(game_t* game, col_t col, grid_t player_grid) {
     int8_t row_index = game->cols_occupation[col] - 1;
 
     // Vertical check
@@ -96,11 +76,11 @@ char makes_new_connect4(game_t* game, int8_t col, uint64_t player_grid) {
 
     //printf("DEBUG : PASSED HORIZONTAL CHECK\n");
     
-    // Diagonal up-right check     // BUG : le check teste les offsets 0-6-12-18 (passe à travers le mur)
+    // Diagonal up-right check
     consecutive_counter = 0;
     int8_t increment = ROW_LENGTH-1;
     int8_t dist_to_closest_limit = (row_index < col) ? row_index : col;
-    int8_t curr_col = col - dist_to_closest_limit;
+    col_t curr_col = col - dist_to_closest_limit;
     init_offset = compute_offset(col, row_index) - increment * dist_to_closest_limit;
     for (int8_t offset = init_offset; offset < ROW_LENGTH*COL_HEIGHT && curr_col < ROW_LENGTH; offset += increment) {
         if (player_grid & (BIT_ONE<<offset)) consecutive_counter++;
@@ -111,7 +91,7 @@ char makes_new_connect4(game_t* game, int8_t col, uint64_t player_grid) {
 
     //printf("DEBUG : PASSED UPRIGHT CHECK\n");
 
-    // Diagonal up-left check     // BUG : le check teste les offsets 6-14-22-30 (passe à travers le mur)
+    // Diagonal up-left check
     consecutive_counter = 0;
     increment = ROW_LENGTH+1;
     dist_to_closest_limit = (row_index < ROW_LENGTH-1-col) ? row_index : ROW_LENGTH-1-col;
@@ -130,7 +110,50 @@ char makes_new_connect4(game_t* game, int8_t col, uint64_t player_grid) {
 }
 
 
-int8_t play(game_t* game, int8_t player, int8_t col) {
+/*
+===========================================
+=================== API ===================
+===========================================
+*/
+
+
+game_t* game_init(player_t starting_player) {
+    // Preliminary checks
+    if (starting_player != PLAYER_A && starting_player != PLAYER_B) return NULL;
+
+    game_t* g_ptr = (game_t*) malloc(sizeof(game_t));
+    if (g_ptr == NULL) return NULL;
+    *get_player_grid(g_ptr, starting_player) = TURN_BIT;
+    g_ptr->gridA = TURN_BIT;
+    return g_ptr;
+}
+
+
+void game_destroy(game_t* game) { free(game); }
+
+
+game_t* copy(game_t* game) {
+    if (game == NULL) return NULL;
+    game_t* new_game = (game_t*) malloc(sizeof(game));
+    if (new_game == NULL) return NULL;
+    new_game->gridA = game->gridA;
+    new_game->gridB = game->gridB;
+    for (col_t c = 0; c < ROW_LENGTH; c++) new_game->cols_occupation[c] = game->cols_occupation[c];
+    return new_game;
+}
+
+
+int8_t winner(game_t* game) {
+    // Preliminary checks
+    if (game == NULL) return ARG_ERROR;
+
+    if (game->gridA & WIN_BIT) return PLAYER_A;
+    if (game->gridB & WIN_BIT) return PLAYER_B;
+    return -1;
+}
+
+
+int8_t play(game_t* game, player_t player, col_t col) {
     // Preliminary checks
     if (game == NULL) return ARG_ERROR;
     if (player != PLAYER_A && player != PLAYER_B) return ARG_ERROR;
@@ -138,13 +161,13 @@ int8_t play(game_t* game, int8_t player, int8_t col) {
 
     if (winner(game) >= 0) return -3;
     if (game->cols_occupation[col] >= COL_HEIGHT) return -2;
-    uint64_t* this_grid = get_player_grid(game, player);
+    grid_t* this_grid = get_player_grid(game, player);
     if (!is_their_turn_to_play(game, *this_grid)) return -1;
 
     // The move is valid
     
     // Add move
-    uint64_t* other_grid = get_player_grid(game, 1-player);
+    grid_t* other_grid = get_player_grid(game, 1-player);
     int8_t offset = compute_offset(col, game->cols_occupation[col]);
     *this_grid = *this_grid | (BIT_ONE << offset);
     *this_grid = *this_grid & ~TURN_BIT;
@@ -161,13 +184,19 @@ int8_t play(game_t* game, int8_t player, int8_t col) {
 }
 
 
-game_t* play_copy(game_t* game, int8_t player, int8_t col) {
+int8_t play_auto(game_t* game, col_t col) {
+    if (is_their_turn_to_play(game, game->gridA)) return play(game, PLAYER_A, col);
+    return play(game, PLAYER_B, col);
+}
+
+
+game_t* play_copy(game_t* game, player_t player, col_t col) {
     game_t* new_game = (game_t*) malloc(sizeof(game_t));
     if (new_game == NULL) return NULL;
 
     new_game->gridA = game->gridA;
     new_game->gridB = game->gridB;
-    for (int8_t i = 0; i < ROW_LENGTH; i++) 
+    for (col_t i = 0; i < ROW_LENGTH; i++) 
             new_game->cols_occupation[i] = game->cols_occupation[i];
     int result = play(new_game, player, col);
     if (result < 0) {
@@ -178,9 +207,15 @@ game_t* play_copy(game_t* game, int8_t player, int8_t col) {
 }
 
 
+game_t* play_copy_auto(game_t* game, col_t col) {
+    if (is_their_turn_to_play(game, game->gridA)) return play_copy(game, PLAYER_A, col);
+    return play_copy(game, PLAYER_B, col);
+}
+
+
 void print_game(game_t* game) {
     for(int8_t r = COL_HEIGHT-1; r >= 0; r--) {
-        for (int8_t c = 0; c < ROW_LENGTH; c++) {
+        for (col_t c = 0; c < ROW_LENGTH; c++) {
             char disk = '_';
             int8_t offset = compute_offset(c, r);
             if (game->gridA & (BIT_ONE<<offset)) disk = 'x';
@@ -199,7 +234,7 @@ void print_game(game_t* game) {
 
     printf("%ld\n%ld\n", game->gridA, game->gridB);
     printf("[");
-    for (int8_t i = 0; i < ROW_LENGTH; i++) printf("%d, ", game->cols_occupation[i]);
+    for (col_t i = 0; i < ROW_LENGTH; i++) printf("%d, ", game->cols_occupation[i]);
     printf("]\n");
 
 
