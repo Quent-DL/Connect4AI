@@ -70,7 +70,7 @@ game_t* copy(game_t* game);
  * -1 if the game is not finished yet (no player has won yet);
  * ARG_ERROR if the arguments are invalid
 */
-int8_t winner(game_t* game);
+player_t winner(game_t* game);
 
 
 /**

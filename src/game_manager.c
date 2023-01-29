@@ -123,6 +123,7 @@ game_t* game_init(player_t starting_player) {
 
     game_t* g_ptr = (game_t*) malloc(sizeof(game_t));
     if (g_ptr == NULL) return NULL;
+    for (col_t col = 0; col < ROW_LENGTH; col++) g_ptr->cols_occupation[col] = 0;
     *get_player_grid(g_ptr, starting_player) = TURN_BIT;
     g_ptr->gridA = TURN_BIT;
     return g_ptr;
@@ -143,7 +144,7 @@ game_t* copy(game_t* game) {
 }
 
 
-int8_t winner(game_t* game) {
+player_t winner(game_t* game) {
     // Preliminary checks
     if (game == NULL) return ARG_ERROR;
 
@@ -214,29 +215,35 @@ game_t* play_copy_auto(game_t* game, col_t col) {
 
 
 void print_game(game_t* game) {
+    printf("\n[GAME STATE]\n\n");
+    printf("0 1 2 3 4 5 6\n");
     for(int8_t r = COL_HEIGHT-1; r >= 0; r--) {
         for (col_t c = 0; c < ROW_LENGTH; c++) {
-            char disk = '_';
+            //char disk = '_';
             int8_t offset = compute_offset(c, r);
-            if (game->gridA & (BIT_ONE<<offset)) disk = 'x';
-            else if (game->gridB & (BIT_ONE<<offset)) disk = 'o';
-            printf("%c", disk);
+            if (game->gridA & (BIT_ONE<<offset)) printf("● ");
+            else if (game->gridB & (BIT_ONE<<offset)) printf("○ ");
+            else printf("_ ");
+            //printf("%c ", disk);
         }
         printf("\n");
     }
-    if (game->gridA & TURN_BIT) printf("=== Turn : A (x)\n");
-    else if (game->gridB & TURN_BIT) printf("=== Turn : B (o)\n");
-    else printf("=== TURN : ERROR\n");
+    if (game->gridA & TURN_BIT) printf("\n=== Turn : A (●)\n");
+    else if (game->gridB & TURN_BIT) printf("\n=== Turn : B (○)\n");
+    else printf("\n=== TURN : ERROR\n");
 
     if (game->gridA & WIN_BIT) printf("=== WIN : A has won\n");
     else if (game->gridB & WIN_BIT) printf("=== WIN : B has won\n");
     else printf("=== WIN : _\n");
 
+    printf("\n");
+}
+
+
+void debug_print_game(game_t* game) {
+    print_game(game);
     printf("%ld\n%ld\n", game->gridA, game->gridB);
     printf("[");
     for (col_t i = 0; i < ROW_LENGTH; i++) printf("%d, ", game->cols_occupation[i]);
     printf("]\n");
-
-
-    printf("\n");
 }
