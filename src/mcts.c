@@ -18,24 +18,22 @@ static node_t* tree_root = NULL;
 */
 
 
-/**
- * Compute the UCB weight of a non-leaf node according to Kocsis and Szepesvári (UCB).
- * 
- * @param node the MCTS node whose weight we want to compute. Must not be leaf.
- * 
- * @return the weight of that node computed via UCB. A relatively high value makes it very likely to be selected;
- * 0.0 if 'node' is NULL.
-*/
-static double compute_UCB(node_t* node) {
-    // Preliminary check
-    if (node == NULL) return 0.0;
+// ============= NODES MANAGEMENT ============
 
-    double N = (double) node->parent->nb_visits;
-    double n = (double) node->nb_visits;
-    double w = (double) node->nb_wins;
-    if (n != 0 && N != 0) return w/n + sqrt(2*log(N)/n);    // usual case
-    if (N == 0) return 0.0;    // empty MTCS tree
-    return 2*log(N);    // leaf who encountered an error during its first simulation (during the node creation)
+
+/**
+ * Returns whether a MCTS node is a leaf
+ * 
+ * @param node the node to test
+ * 
+ * @returns a boolean that represents whether the node is a leaf.
+*/
+static boolean is_leaf(node_t* node) {
+
+    boolean leaf = 1;
+    for (col_t col = 0; col < ROW_LENGTH; col++)
+        if (node->children[col] != NULL) leaf = 0;
+    return (node->nb_visits <= (uint32_t) 1 || leaf);
 }
 
 
@@ -131,19 +129,83 @@ static void recursive_node_destroy(node_t* node) {
 }
 
 
-/**
- * Returns whether a MCTS node is a leaf
- * 
- * @param node the node to test
- * 
- * @returns a boolean that represents whether the node is a leaf.
-*/
-static boolean is_leaf(node_t* node) {
+// ============= DETECTING THREATS ============
 
-    boolean leaf = 1;
-    for (col_t col = 0; col < ROW_LENGTH; col++)
-        if (node->children[col] != NULL) leaf = 0;
-    return (node->nb_visits <= (uint32_t) 1 || leaf);
+
+/**
+ * Analyses whether the next player can make a Connect4 during their direct turn.
+ * 
+ * @param game The game status.
+ * 
+ * @returns The column in [0, ROW_LENGTH[ which allows the next player to make a Connect4, if possible. In cases several columns
+ * lead to a Connect4, returns the one the most on the left;
+ * -1 if the player can not make a Connect4 in their direct next turn. In case of memory allocation errors,
+ * false negatives may occur.
+ * 
+*/
+static col_t can_make_connect4_now(game_t* game) {
+    for (col_t col = 0; col < ROW_LENGTH; col++) {
+        if (play_auto_without_update(game, col) == 1) return col;
+    }
+    return -1;
+}
+
+
+/**
+ * Annalyses whether the latest player to have played threatens to make a Connect4 during their next turn.
+ * 
+ * @param game The game status.
+ * 
+ * @returns If the latest player threatens to make a Connect4 during their next turn, returns the column in [0, ROW_LENGTH[
+ * which would allow them to do so. If there are multiple threats, returns the first one detected.
+ * -1 if no threats are detected. In case of memory allocation errors,
+ * false negatives may occur.
+*/
+static col_t does_latest_player_threaten_to_connect4(game_t* game) {
+    // To make sure the intermediary turn does not affect the possible Connect4, we make sure that the column of
+    // the intermadiary turn and the tested column do not collide. 
+    uint8_t nb_valid_iterations = 0;
+
+    for (col_t move1 = 0; move1 < ROW_LENGTH && nb_valid_iterations < 2; move1++) {
+        game_t* after_move1 = copy(game);
+        if (after_move1 == NULL) continue;
+        if (play_auto(after_move1, move1) != 0) continue; 
+        // valid iteration
+        nb_valid_iterations++;
+        for (col_t move2 = 0; move2 < ROW_LENGTH; move2++) {
+            if (move1 == move2) continue;    // first move and second move's columns collide
+            if (play_auto_without_update(after_move1, move2) == 1) {
+                game_destroy(after_move1);
+                return move2;    // move2 threatens a Connect4 from the latest player
+            }
+        }
+    }
+
+    return -1;
+}
+
+
+// ============= MCTS STEPS ============ 
+
+
+/**
+ * Compute the UCB weight of a non-leaf node according to Kocsis and Szepesvári (UCB).
+ * 
+ * @param node the MCTS node whose weight we want to compute. Must not be leaf.
+ * 
+ * @return the weight of that node computed via UCB. A relatively high value makes it very likely to be selected;
+ * 0.0 if 'node' is NULL.
+*/
+static double compute_UCB(node_t* node) {
+    // Preliminary check
+    if (node == NULL) return 0.0;
+
+    double N = (double) node->parent->nb_visits;
+    double n = (double) node->nb_visits;
+    double w = (double) node->nb_wins;
+    if (n != 0 && N != 0) return w/n + sqrt(2*log(N)/n);    // usual case
+    if (N == 0) return 0.0;    // empty MTCS tree
+    return 2*log(N);    // leaf who encountered an error during its first simulation (during the node creation)
 }
 
 
@@ -238,6 +300,7 @@ static void MTCS_backpropagation(node_t* selected_old_leaf) {
     }
 }
 
+
 /**
  * Progress in the tree by one level of depths, designing the children of tree_root at index selected_col as the new tree_root.
  * Updates global variable tree_root and frees the other, unused children.
@@ -252,11 +315,13 @@ static void progress_in_tree(col_t selected_col) {
     selected_node->parent = NULL;
 }
 
+
 /**
  * Fills the global variable tree_root using the MCTS algorithm. Then, selects the best estimated move, adapts tree_root
  * to take notice of that selection, and returns the selected move. Assumes it is the AI's turn to play.
  * 
- * @returns the column in [0-6] selected by the MCTS algorithm to play.
+ * @returns the column in [0-6] selected by the MCTS algorithm to play. Running this function adds to to the tree,
+ * but does NOT update tree_root according to the returned column.
  * MCTS_FAIL if the MCTS algorithm applicaiton fails (extreme error)
 */
 static col_t MCTS() {
@@ -284,9 +349,6 @@ static col_t MCTS() {
     }
     if (selected_col == -1) return MCTS_FAIL;
     
-    // Updates the tree to take it into account
-    progress_in_tree(selected_col);
-    
     return selected_col;
 }
 
@@ -296,7 +358,6 @@ static col_t MCTS() {
 ==================== API ==================
 ===========================================
 */
-
 
 
 col_t init_MCTS(player_t playing_as, uint32_t max_visits) {
@@ -338,7 +399,26 @@ col_t input_MCTS(col_t col) {
     if (col < 0 || col >= ROW_LENGTH) return ARG_ERROR;
     if (tree_root->children[col] == NULL) return -1;
     progress_in_tree(col);
-    return MCTS();
+
+    col_t col_to_play;
+
+    // If the AI can make a Connect4 in the immediate state -> exploit it
+    col_to_play = can_make_connect4_now(tree_root->state);
+    if (col_to_play >= 0) {
+        progress_in_tree(col_to_play);
+        return col_to_play;
+    }
+    // If the human is threatening to make a connect4, and the AI absolutely needs to avert it
+    col_to_play = does_latest_player_threaten_to_connect4(tree_root->state);
+    if (col_to_play >= 0) {
+        progress_in_tree(col_to_play);
+        return col_to_play;
+    }
+
+    // Else, the AI is not forced to play any column, so it runs the MCTS to decide its next turn.
+    col_to_play = MCTS();
+    progress_in_tree(col_to_play);
+    return col_to_play;
 }
 
 

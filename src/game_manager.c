@@ -190,6 +190,14 @@ int8_t play_auto(game_t* game, col_t col) {
     return play(game, PLAYER_B, col);
 }
 
+int8_t play_auto_without_update(game_t* game, col_t col) {
+    game_t* cg = copy(game);
+    if (cg == NULL) return MEM_ERROR;
+    int8_t res = play_auto(cg, col);
+    game_destroy(cg);
+    return res;
+}
+
 
 game_t* play_copy(game_t* game, player_t player, col_t col) {
     game_t* new_game = (game_t*) malloc(sizeof(game_t));

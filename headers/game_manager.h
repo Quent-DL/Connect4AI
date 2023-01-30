@@ -8,6 +8,7 @@
 #define PLAYER_A 0
 #define PLAYER_B 1
 #define ARG_ERROR -64
+#define MEM_ERROR -63
 #define ROW_LENGTH 7
 #define COL_HEIGHT 6
 
@@ -74,7 +75,7 @@ player_t winner(game_t* game);
 
 
 /**
- * Makes a move for a game of Connect4 and applies the result to the given game.
+ * Makes a move for a game of Connect4 and updates the given game.
  * 
  * @param game the current state of the game to which apply the move and (if successful) the results
  * @param player the player who attempts to play the move. Must be PLAYER_A or PLAYER_B
@@ -94,6 +95,24 @@ int8_t play(game_t* game, player_t player, col_t col);
  * Just like 'play', but the move is automatically played by the player whose turn it is. 
 */
 int8_t play_auto(game_t* game, col_t col);
+
+
+/**
+ * Returns the result of playing a move for a game of Connect4 WITHOUT updating the given game.
+ * The play is automatically played for the player's whose turn it is.
+ * 'game' is unchanged after calling this function.
+ * 
+ * @param game the current state of the game to which apply the move and (if successful) the results
+ * @param col the column in which the player attempts to add a disk. Must be contained in [0, 6].
+ * 
+ * @returns 1 if the move is valid and results in a win;
+ * 0 if the move is valid;
+ * -2 if the targetted column is full;
+ * -3 if the game is already finished;
+ * MEM_ERROR if the memory allocation for an intern variable fails
+ * ARG_ERROR if the arguments are invalid
+*/
+int8_t play_auto_without_update(game_t* game, col_t col);
 
 
 /**

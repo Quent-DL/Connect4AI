@@ -30,10 +30,10 @@ int main(int argc, char* argv[]) {
     while(1) {    // TODO add actual loop condition
 
         // Human turn
-        printf("\n>>>Input human move : ");
-        scanf("%d", &scanned);
-        latest_col = (col_t) scanned;
         do {
+            printf("\n>>>Input human move : ");
+            scanf("%d", &scanned);
+            latest_col = (col_t) scanned;
             move_res = play_auto(game, latest_col);
             if (move_res == 1) terminate_game(game, PLAYER_A);
         } while (move_res == -2);    // in case of repeated bad input from the human player
@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
 
     // TODO : pq nb_visits tronqué ? 
     // TODO : pq nb_wins = 0 ou 7 d'un coup ?
+    // TODO : prevent MCTS from *creating* connect4 for other player (creating threats against themselves)
 
 
 }
