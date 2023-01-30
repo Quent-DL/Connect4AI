@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
             latest_col = (col_t) scanned;
             move_res = play_auto(game, latest_col);
             if (move_res == 1) terminate_game(game, PLAYER_A);
-        } while (move_res == -2);    // in case of repeated bad input from the human player
+        } while (move_res == -2 || move_res == ARG_ERROR);    // in case of repeated bad input from the human player
 
         // AI turn
         latest_col = input_MCTS(latest_col);
@@ -48,7 +48,6 @@ int main(int argc, char* argv[]) {
 
 
     // TODO : pq nb_visits tronqué ? 
-    // TODO : pq nb_wins = 0 ou 7 d'un coup ?
     // TODO : prevent MCTS from *creating* connect4 for other player (creating threats against themselves)
 
 

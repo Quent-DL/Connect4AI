@@ -204,8 +204,7 @@ static double compute_UCB(node_t* node) {
     double n = (double) node->nb_visits;
     double w = (double) node->nb_wins;
     if (n != 0 && N != 0) return w/n + sqrt(2*log(N)/n);    // usual case
-    if (N == 0) return 0.0;    // empty MTCS tree
-    return 2*log(N);    // leaf who encountered an error during its first simulation (during the node creation)
+    else return 0.0;    // empty MTCS tree or leaf with error during first simulation (during the node creation)
 }
 
 
@@ -288,8 +287,8 @@ static void MTCS_backpropagation(node_t* selected_old_leaf) {
     // Computing the total increments to backpropagate
     for (col_t col = 0; col < ROW_LENGTH; col++) {
         if (selected_old_leaf->children[col] != NULL) {
-            incr_visits += selected_old_leaf->nb_visits;
-            incr_wins += selected_old_leaf->nb_wins;    // is supposed to be 0 or 1
+            incr_visits += selected_old_leaf->children[col]->nb_visits;
+            incr_wins += selected_old_leaf->children[col]->nb_wins;    // supposedly 0 or 1 if only 1 simulation when creating node
         }
     }
 
@@ -372,12 +371,19 @@ col_t init_MCTS(player_t playing_as, uint32_t max_visits) {
         free(init_game);
         return -1;
     }
+
+    // Initialising the first possible paths
     for (col_t col = 0; col < ROW_LENGTH; col++) {
         game_t* game_continuation = play_copy_auto(init_game, col);
         if (game_continuation == NULL) {    // memory alloc error, because invalid move is supposed impossible here
             recursive_node_destroy(tree_root);
         }
-        tree_root->children[col] = create_node_and_simulate(game_continuation, tree_root);
+        node_t* new_child = create_node_and_simulate(game_continuation, tree_root);
+        if (new_child != NULL) {
+            tree_root->children[col] = new_child;
+            tree_root->nb_visits += new_child->nb_visits;
+            tree_root->nb_wins += new_child->nb_wins;
+        }
     }
 
     // If the IA is PLAYER_A : runs the MCTS from empty game, updates the tree and returns result
@@ -406,12 +412,14 @@ col_t input_MCTS(col_t col) {
     col_to_play = can_make_connect4_now(tree_root->state);
     if (col_to_play >= 0) {
         progress_in_tree(col_to_play);
+        MCTS();
         return col_to_play;
     }
     // If the human is threatening to make a connect4, and the AI absolutely needs to avert it
     col_to_play = does_latest_player_threaten_to_connect4(tree_root->state);
     if (col_to_play >= 0) {
         progress_in_tree(col_to_play);
+        MCTS();
         return col_to_play;
     }
 
