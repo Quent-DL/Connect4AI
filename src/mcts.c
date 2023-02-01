@@ -4,11 +4,11 @@
 #include <stdio.h>
 
 
-#define MAX_LOOPS 20000
+#define MAX_LOOPS 1000000000000
 
 
 static player_t PLAYING_AS = PLAYER_B;
-static uint32_t MAX_ITER = 20;
+static uint32_t MAX_VISITS = 20;    // one visit == one game simulation
 static node_t* tree_root = NULL;
 
 /*
@@ -91,7 +91,7 @@ static int8_t MTCS_simulation(game_t* init_state) {
  * @param parent is the parent node. Is NULL for the root tree, and assumed non-null for all other nodes.
  * 
  * @returns The pointer to the newly created node in case of success;
- * NULL in case of memory allocation error.
+ * NULL in case of memory allocation error or if the argument 'state' is passed as NULL
 */
 static node_t* create_node_and_simulate(game_t* state, node_t* parent) {
     node_t* new_node = (node_t*) malloc(sizeof(node_t));
@@ -203,7 +203,13 @@ static double compute_UCB(node_t* node) {
     double N = (double) node->parent->nb_visits;
     double n = (double) node->nb_visits;
     double w = (double) node->nb_wins;
-    if (n != 0 && N != 0) return w/n + sqrt(2*log(N)/n);    // usual case
+    if (n != 0 && N != 0) {    // usual case
+        // the currently player will always try to maximise THEIR win ratio, not the AI's
+        // If now_playing != PLAYING_AS, that means the parent of node represents the turn of the AI.
+        // Therefore, 'node' should have a great score if it maximises the w/n ratio.
+        double ratio = (now_playing(node->state) != PLAYING_AS) ? w/n : 1-w/n;
+        return ratio + sqrt(2*log(N)/n);
+    }
     else return 0.0;    // empty MTCS tree or leaf with error during first simulation (during the node creation)
 }
 
@@ -220,7 +226,7 @@ static node_t* MCTS_selection(node_t* node) {
     if (is_leaf(node)) return node;
 
     uint8_t nb_ties = 1;
-    double max_UCB = 0.0;
+    double max_UCB = -0.1;
     node_t* max_node = NULL;
     for (uint8_t i = 0; i < ROW_LENGTH; i++) {
         node_t* n = node->children[i];
@@ -254,19 +260,6 @@ static node_t* MCTS_selection(node_t* node) {
  * @param selected_leaf the MCTS node selected during the selection step of the MCTS algorithm. Is assumed to be non-null.
 */
 static void MCTS_expansion_simulation(node_t* selected_leaf) {
-    // because otherwise already finished games get selected in a loop in function MCTS() and lead to pseudo-infinite loops
-    player_t w = winner(selected_leaf->state);
-    if (w == PLAYING_AS) {    // case selected node is a win for the ai
-        selected_leaf->nb_wins += 7;
-        selected_leaf->nb_visits += 7;
-        for (col_t col = 0; col < ROW_LENGTH; col++) selected_leaf->children[col] = NULL;
-        return;
-    } else if (w == 1-PLAYING_AS) {    // case selected node is a win for the human
-        selected_leaf->nb_visits += 7;
-        for (col_t col = 0; col < ROW_LENGTH; col++) selected_leaf->children[col] = NULL;
-        return;
-    }
-
     for (col_t col = 0; col < ROW_LENGTH; col++) {
         game_t* new_state = play_copy_auto(selected_leaf->state, col);
         if (new_state == NULL) selected_leaf->children[col] = NULL;
@@ -284,11 +277,19 @@ static void MTCS_backpropagation(node_t* selected_old_leaf) {
     uint32_t incr_wins = 0;
     uint32_t incr_visits = 0;
 
-    // Computing the total increments to backpropagate
-    for (col_t col = 0; col < ROW_LENGTH; col++) {
-        if (selected_old_leaf->children[col] != NULL) {
-            incr_visits += selected_old_leaf->children[col]->nb_visits;
-            incr_wins += selected_old_leaf->children[col]->nb_wins;    // supposedly 0 or 1 if only 1 simulation when creating node
+    player_t w = winner(selected_old_leaf->state);
+    if (w == PLAYING_AS) {    // case selected node is a win for the ai
+        incr_wins= 7;
+        incr_visits = 7;
+    } else if (w == 1-PLAYING_AS) {    // case selected node is a win for the human
+        incr_visits = 7;
+    } else {
+        // Computing the total increments to backpropagate
+        for (col_t col = 0; col < ROW_LENGTH; col++) {
+            if (selected_old_leaf->children[col] != NULL) {
+                incr_visits += selected_old_leaf->children[col]->nb_visits;
+                incr_wins += selected_old_leaf->children[col]->nb_wins;    // supposedly 0 or 1 if only 1 simulation when creating node
+            }
         }
     }
 
@@ -303,15 +304,18 @@ static void MTCS_backpropagation(node_t* selected_old_leaf) {
 /**
  * Progress in the tree by one level of depths, designing the children of tree_root at index selected_col as the new tree_root.
  * Updates global variable tree_root and frees the other, unused children.
+ * If no simulations were made for that game playout, creates a new node accordingly and sets it as the tree_root.
+ * WARNING : If the move represented by selected_col is invalid, the new tree_root will be set to NULL.
  * 
- * @param selected_col the move that has been played in [0, 6].
+ * @param selected_col the move that has been played in [0, 6]. Is assumed to be valid
 */
 static void progress_in_tree(col_t selected_col) {
     node_t* selected_node = tree_root->children[selected_col];
+    if (selected_node == NULL) selected_node = create_node_and_simulate(play_copy_auto(tree_root->state, selected_col), NULL);
     tree_root->children[selected_col] = NULL;
     recursive_node_destroy(tree_root);
-    tree_root = selected_node;
     selected_node->parent = NULL;
+    tree_root = selected_node;
 }
 
 
@@ -326,7 +330,7 @@ static void progress_in_tree(col_t selected_col) {
 static col_t MCTS() {
     // Runs the algorithm
     uint32_t loops = 0;    // there to prevent infinite loops when the selected node won't change
-    while (tree_root->nb_visits < MAX_ITER-7 && loops < MAX_LOOPS) {
+    while (tree_root->nb_visits < MAX_VISITS-7 && loops < MAX_LOOPS) {
         node_t* selected = MCTS_selection(tree_root);
         MCTS_expansion_simulation(selected);
         MTCS_backpropagation(selected);
@@ -348,6 +352,7 @@ static col_t MCTS() {
     }
     if (selected_col == -1) return MCTS_FAIL;
     
+    printf("<<<<< %d visits of root node before progression >>>>>\n", tree_root->nb_visits);   // DEBUG DEBUG DEBUG
     return selected_col;
 }
 
@@ -364,7 +369,7 @@ col_t init_MCTS(player_t playing_as, uint32_t max_visits) {
     game_t* init_game = game_init(PLAYER_A);
     if (init_game == NULL) return -1;
     PLAYING_AS = playing_as;
-    MAX_ITER = max_visits;
+    MAX_VISITS = max_visits;
 
     tree_root = create_node_and_simulate(init_game, NULL);
     if (tree_root == NULL) {

@@ -62,6 +62,16 @@ game_t* copy(game_t* game);
 
 
 /**
+ * Returns the player whose turn it is.
+ * 
+ * @param game the game
+ * 
+ * @returns PLAYER_A or PLAYER_B depending on whose turn it is. If the game has already ended, still returns the player
+ * whose turn it would have been if the latest move hadn't resulted in a win.
+*/
+player_t now_playing(game_t* game);
+
+/**
  * Returns the winner of the game.
  * 
  * @param game the game to check
@@ -116,32 +126,19 @@ int8_t play_auto_without_update(game_t* game, col_t col);
 
 
 /**
- * Makes a move for a game of Connect4. The result of the move is applied onto a new game, and the one passed as an argument is left untouched.
+ * Makes a move for a game of Connect4. The result of the move is applied onto a new game, 
+ * and the one passed as an argument is left untouched.
+ * The move is automatically played by the player whose turn it is. 
  * 
  * @param game the current state of game
- * @param player the player who attempts to play the move. Must be PLAYER_A or PLAYER_B
  * @param col the column in which the player attempts to add a disk
  * 
  * @returns The new (updated) game if the move is valid (even if it ends the game), and 'game' is left untouched;
  * NULL if any kind of error occurs (e.g. if the move is invalid or if the memory allocation for the new game is unsuccesful)
 */
-game_t* play_copy(game_t* game, player_t player, col_t col);
-
-
-/**
- * Just like 'play_copy', but the move is automatically played by the player whose turn it is.
-*/
 game_t* play_copy_auto(game_t* game, col_t col);
 
 
 void print_game(game_t* game);
-
-
-// HELPER FUNCTIONS :
-//static uint64_t* get_player_grid(game_t* game, int8_t player);
-//static uint64_t is_their_turn_to_play(game_t* game, uint64_t player_grid);
-//static int8_t compute_offset(int8_t col, int8_t row);
-//static char makes_new_connect4(game_t* game, int8_t col, uint64_t player_grid);
-
 
 #endif /* GAME_MANAGER_H */

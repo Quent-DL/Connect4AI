@@ -45,10 +45,4 @@ int main(int argc, char* argv[]) {
         print_state();
         if (move_res == 1) terminate_game(game, PLAYER_B);
     }
-
-
-    // TODO : pq nb_visits tronqué ? 
-    // TODO : prevent MCTS from *creating* connect4 for other player (creating threats against themselves)
-
-
 }

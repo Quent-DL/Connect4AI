@@ -144,6 +144,11 @@ game_t* copy(game_t* game) {
 }
 
 
+player_t now_playing(game_t* game) {
+    return (game->gridA & TURN_BIT) ? PLAYER_A : PLAYER_B;
+}
+
+
 player_t winner(game_t* game) {
     // Preliminary checks
     if (game == NULL) return ARG_ERROR;
@@ -199,26 +204,16 @@ int8_t play_auto_without_update(game_t* game, col_t col) {
 }
 
 
-game_t* play_copy(game_t* game, player_t player, col_t col) {
-    game_t* new_game = (game_t*) malloc(sizeof(game_t));
+game_t* play_copy_auto(game_t* game, col_t col) {
+    game_t* new_game = copy(game);
     if (new_game == NULL) return NULL;
 
-    new_game->gridA = game->gridA;
-    new_game->gridB = game->gridB;
-    for (col_t i = 0; i < ROW_LENGTH; i++) 
-            new_game->cols_occupation[i] = game->cols_occupation[i];
-    int result = play(new_game, player, col);
-    if (result < 0) {
-        free(new_game);
+    int8_t res = play_auto(new_game, col);
+    if (res < 0) {
+        game_destroy(new_game);
         return NULL;
     }
     return new_game;
-}
-
-
-game_t* play_copy_auto(game_t* game, col_t col) {
-    if (is_their_turn_to_play(game, game->gridA)) return play_copy(game, PLAYER_A, col);
-    return play_copy(game, PLAYER_B, col);
 }
 
 
