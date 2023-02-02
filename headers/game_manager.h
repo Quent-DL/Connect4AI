@@ -36,12 +36,10 @@ typedef struct game {
 /**
  * Creates a game of Connect4
  * 
- * @param starting_player the first player to start. Must be PLAYER_A or PLAYER_B.
- * 
  * @returns a pointer to the initialised game;
- * NULL if the memory allocation for the game unsuccesful or if the arguments are invalid
+ * NULL if the memory allocation for the game unsuccesful
 */
-game_t* game_init(player_t starting_player);
+game_t* game_init();
 
 
 /**

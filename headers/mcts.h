@@ -29,7 +29,7 @@ typedef struct mcts_node {
  * @returns ROW_LENGTH if playing_as == PLAYER_B;
  * A number in [0,ROW_LENGTH[ that represents the column which the AI decides to play in if playing_as == PLAYER_A (i.e. if the AI starts the game);
  * ARG_ERROR if the arguments passed are invalid.
- * -1 if a memory error occurs
+ * MEMERROR if a memory error occurs
 */
 col_t init_MCTS(player_t playing_as, uint32_t max_iter);
 
@@ -45,7 +45,7 @@ void destroy_MCTS();
  * @returns the column in [0, 6] the AI chose to make its move if everything goes well;
  * ARG_ERROR if the argments are invalid;
  * -1 if the move played by the live player is invalid (column full, ...)
- * MCTS_FAIL in case of MTCS_FAILING (no move could be computed due to an exception or an critical lack of memory)
+ * MCTS_FAIL in case of MTCS failure (no move could be computed due to an exception or an critical lack of memory)
 */
 col_t input_MCTS(col_t col);
 

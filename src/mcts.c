@@ -366,15 +366,15 @@ static col_t MCTS() {
 
 col_t init_MCTS(player_t playing_as, uint32_t max_visits) {
     if (max_visits < 8 || (playing_as != PLAYER_A && playing_as != PLAYER_B)) return ARG_ERROR;
-    game_t* init_game = game_init(PLAYER_A);
-    if (init_game == NULL) return -1;
+    game_t* init_game = game_init();
+    if (init_game == NULL) return MEMERROR;
     PLAYING_AS = playing_as;
     MAX_VISITS = max_visits;
 
     tree_root = create_node_and_simulate(init_game, NULL);
     if (tree_root == NULL) {
         free(init_game);
-        return -1;
+        return MEMERROR;
     }
 
     // Initialising the first possible paths

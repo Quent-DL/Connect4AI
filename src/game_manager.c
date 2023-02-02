@@ -117,14 +117,10 @@ static boolean makes_new_connect4(game_t* game, col_t col, grid_t player_grid) {
 */
 
 
-game_t* game_init(player_t starting_player) {
-    // Preliminary checks
-    if (starting_player != PLAYER_A && starting_player != PLAYER_B) return NULL;
-
+game_t* game_init() {
     game_t* g_ptr = (game_t*) malloc(sizeof(game_t));
     if (g_ptr == NULL) return NULL;
     for (col_t col = 0; col < ROW_LENGTH; col++) g_ptr->cols_occupation[col] = 0;
-    *get_player_grid(g_ptr, starting_player) = TURN_BIT;
     g_ptr->gridA = TURN_BIT;
     return g_ptr;
 }
