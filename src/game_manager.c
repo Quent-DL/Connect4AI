@@ -122,6 +122,7 @@ game_t* game_init() {
     if (g_ptr == NULL) return NULL;
     for (col_t col = 0; col < ROW_LENGTH; col++) g_ptr->cols_occupation[col] = 0;
     g_ptr->gridA = TURN_BIT;
+    g_ptr->gridB = 0;
     return g_ptr;
 }
 
@@ -131,7 +132,7 @@ void game_destroy(game_t* game) { free(game); }
 
 game_t* copy(game_t* game) {
     if (game == NULL) return NULL;
-    game_t* new_game = (game_t*) malloc(sizeof(game));
+    game_t* new_game = (game_t*) malloc(sizeof(game_t));
     if (new_game == NULL) return NULL;
     new_game->gridA = game->gridA;
     new_game->gridB = game->gridB;
@@ -190,6 +191,7 @@ int8_t play_auto(game_t* game, col_t col) {
     if (is_their_turn_to_play(game, game->gridA)) return play(game, PLAYER_A, col);
     return play(game, PLAYER_B, col);
 }
+
 
 int8_t play_auto_without_update(game_t* game, col_t col) {
     game_t* cg = copy(game);

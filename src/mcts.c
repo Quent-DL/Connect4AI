@@ -169,7 +169,10 @@ static col_t does_latest_player_threaten_to_connect4(game_t* game) {
     for (col_t move1 = 0; move1 < ROW_LENGTH && nb_valid_iterations < 2; move1++) {
         game_t* after_move1 = copy(game);
         if (after_move1 == NULL) continue;
-        if (play_auto(after_move1, move1) != 0) continue; 
+        if (play_auto(after_move1, move1) != 0) {
+            game_destroy(after_move1);
+            continue; 
+        }
         // valid iteration
         nb_valid_iterations++;
         for (col_t move2 = 0; move2 < ROW_LENGTH; move2++) {
@@ -179,6 +182,7 @@ static col_t does_latest_player_threaten_to_connect4(game_t* game) {
                 return move2;    // move2 threatens a Connect4 from the latest player
             }
         }
+        game_destroy(after_move1);
     }
 
     return -1;
