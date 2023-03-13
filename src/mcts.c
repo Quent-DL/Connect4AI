@@ -4,9 +4,6 @@
 #include <stdio.h>
 
 
-#define MAX_LOOPS 1000000000000
-
-
 static player_t PLAYING_AS = PLAYER_B;
 static uint32_t MAX_VISITS = 20;    // one visit == one game simulation
 static node_t* tree_root = NULL;
@@ -51,7 +48,7 @@ static boolean is_leaf(node_t* node) {
 static int8_t MTCS_simulation(game_t* init_state) {
     if (init_state == NULL) return MEMERROR;
     player_t winner_check = winner(init_state);
-    if (winner_check >= 0) return winner_check;
+    if (winner_check >= 0) return (winner_check != DRAW) ? winner_check : 0;    // The second clause represents a draw in init_state
     else if (winner_check == ARG_ERROR) return -1;
 
     game_t* playout = copy(init_state);
@@ -60,15 +57,15 @@ static int8_t MTCS_simulation(game_t* init_state) {
     }
 
     int8_t res = 0;
-    while (res != 1 && res != ARG_ERROR) {
+    while (res != 1 && res != 2 && res != ARG_ERROR) {
         col_t first_try_col = random() % ROW_LENGTH;
         res = play_auto(playout, first_try_col);
         for (col_t next = 1; next < ROW_LENGTH && res == -2; next++)
                 res = play_auto(playout, (first_try_col+next)%ROW_LENGTH);
-        if (res == -2) {    // all columns are full but no winner: draw
+        /*if (res == -2) {    // all columns are full but no winner: draw
             game_destroy(playout);
             return 0;
-        }
+        } */    // TODO REMOVE 
     }
     if (res == ARG_ERROR) {
         game_destroy(playout);
@@ -333,8 +330,8 @@ static void progress_in_tree(col_t selected_col) {
 */
 static col_t MCTS() {
     // Runs the algorithm
-    uint32_t loops = 0;    // there to prevent infinite loops when the selected node won't change
-    while (tree_root->nb_visits < MAX_VISITS-7 && loops < MAX_LOOPS) {
+    uint32_t loops = 0;    // there to prevent infinite loops when the selected node won't change or in case of draw
+    while (tree_root->nb_visits < MAX_VISITS-7 && loops < MAX_VISITS) {
         node_t* selected = MCTS_selection(tree_root);
         MCTS_expansion_simulation(selected);
         MTCS_backpropagation(selected);

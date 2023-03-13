@@ -10,7 +10,6 @@
 */
 static void terminate_game(game_t* game, player_t w) {
     print_game(game);
-    printf("--- PLAYER %c WINS ! ---\n", (w == PLAYER_A) ? 'A' : 'B');
     game_destroy(game);
     destroy_MCTS();
     exit(0);
@@ -36,6 +35,7 @@ static col_t human_turn(game_t* game) {
         chosen_col = (col_t) scanned_int;
         move_res = play_auto(game, chosen_col);
         if (move_res == 1) terminate_game(game, PLAYER_A);
+        else if (move_res == 2) terminate_game(game, DRAW);
     } while (move_res == -2 || move_res == ARG_ERROR);    // in case of repeated bad input from the human player
     return chosen_col;
 }
@@ -54,6 +54,7 @@ static void ai_turn(game_t* game, col_t chosen_col) {
     if (ai_col < 0) exit(-1);
     int8_t move_res = play_auto(game, ai_col);
     if (move_res == 1) terminate_game(game, PLAYER_B);
+    else if (move_res == 2) terminate_game(game, DRAW);
 }
 
 
@@ -74,7 +75,7 @@ int main(int argc, char* argv[]) {
     if (ai_plays_as == PLAYER_A) play_auto(game, ia_first_move);
     col_t chosen_human_col;
 
-    while(1) {
+    while(winner(game) != DRAW) {
         print_state();
         chosen_human_col = human_turn(game);
         ai_turn(game, chosen_human_col);

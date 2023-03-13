@@ -7,6 +7,7 @@
 
 #define PLAYER_A 0
 #define PLAYER_B 1
+#define DRAW 2
 #define ARG_ERROR -64
 #define MEM_ERROR -63
 #define ROW_LENGTH 7
@@ -76,6 +77,7 @@ player_t now_playing(game_t* game);
  * 
  * @returns PLAYER_A if player A has won;
  * PLAYER_B if player B has won;
+ * DRAW if the game is a draw;
  * -1 if the game is not finished yet (no player has won yet);
  * ARG_ERROR if the arguments are invalid
 */
@@ -89,7 +91,8 @@ player_t winner(game_t* game);
  * @param player the player who attempts to play the move. Must be PLAYER_A or PLAYER_B
  * @param col the column in which the player attempts to add a disk. Must be contained in [0, 6].
  * 
- * @returns 1 if the move is valid and results in a win for 'player', and 'game' is updated to implement this move;
+ * @returns 2 if the move is valid an results in a draw, and 'game' is updated to implement this move;
+ * 1 if the move is valid and results in a win for 'player', and 'game' is updated to implement this move;
  * 0 if the move is valid, and 'game' is updated to implement this move;
  * -1 if it is not 'player''s turn to play;
  * -2 if the targetted column is full;
@@ -101,6 +104,17 @@ int8_t play(game_t* game, player_t player, col_t col);
 
 /**
  * Just like 'play', but the move is automatically played by the player whose turn it is. 
+ * 
+ * @param game the current state of the game to which apply the move and (if successful) the results
+ * @param col the column in which the player attempts to add a disk. Must be contained in [0, 6].
+ * 
+ * @returns 2 if the move is valid an results in a draw, and 'game' is updated to implement this move;
+ * 1 if the move is valid and results in a win for 'player', and 'game' is updated to implement this move;
+ * 0 if the move is valid, and 'game' is updated to implement this move;
+ * -1 if it is not 'player''s turn to play;
+ * -2 if the targetted column is full;
+ * -3 if the game is already finished;
+ * ARG_ERROR if the arguments are invalid
 */
 int8_t play_auto(game_t* game, col_t col);
 

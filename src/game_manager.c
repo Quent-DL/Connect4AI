@@ -152,6 +152,11 @@ player_t winner(game_t* game) {
 
     if (game->gridA & WIN_BIT) return PLAYER_A;
     if (game->gridB & WIN_BIT) return PLAYER_B;
+    // The following 'if' statement translates to "if the top row is full"
+    grid_t gr = ((game->gridA | game->gridB) >> 35);    // DEBUG
+    gr = gr;    // DEBUG
+    if ((((game->gridA | game->gridB) >> ROW_LENGTH*(COL_HEIGHT-1)) & 0x7F) == 0x7F) 
+        return DRAW;
     return -1;
 }
 
@@ -181,7 +186,7 @@ int8_t play(game_t* game, player_t player, col_t col) {
     if (makes_new_connect4(game, col, *this_grid)) {
         *this_grid = *this_grid | WIN_BIT;
         return 1;
-    }
+    } else if (winner(game) == DRAW) return 2;
 
     return 0;
 }
@@ -233,9 +238,22 @@ void print_game(game_t* game) {
     else if (game->gridB & TURN_BIT) printf("\n=== Turn : B (○)\n");
     else printf("\n=== TURN : ERROR\n");
 
-    if (game->gridA & WIN_BIT) printf("=== WIN : A has won\n");
-    else if (game->gridB & WIN_BIT) printf("=== WIN : B has won\n");
-    else printf("=== WIN : _\n");
+    player_t w = winner(game);
+    char* outcome;
+    switch (w) {
+        case PLAYER_A:
+            outcome = "A has won !!!";
+            break;
+        case PLAYER_B:
+            outcome = "B has won !!!";
+            break;
+        case DRAW:
+            outcome = "The game is a draw !!!";
+            break;
+        default:
+            outcome = "_";
+    }
+    printf("=== Outcome : %s\n", outcome);
 
     printf("\n");
 }

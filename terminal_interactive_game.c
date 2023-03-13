@@ -3,7 +3,7 @@
 
 int main(int argc, char* argv[]) {
 
-    game_t* game = game_init(PLAYER_A);
+    game_t* game = game_init();
     int32_t player = 0;
     int32_t col = -1;
     printf("[Start okay]\n\n");
