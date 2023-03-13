@@ -7,6 +7,7 @@
 static player_t PLAYING_AS = PLAYER_B;
 static uint32_t MAX_VISITS = 20;    // one visit == one game simulation
 static node_t* tree_root = NULL;
+static uint32_t nb_recombined_visits = 0; 
 
 /*
 ===========================================
@@ -62,10 +63,6 @@ static int8_t MTCS_simulation(game_t* init_state) {
         res = play_auto(playout, first_try_col);
         for (col_t next = 1; next < ROW_LENGTH && res == -2; next++)
                 res = play_auto(playout, (first_try_col+next)%ROW_LENGTH);
-        /*if (res == -2) {    // all columns are full but no winner: draw
-            game_destroy(playout);
-            return 0;
-        } */    // TODO REMOVE 
     }
     if (res == ARG_ERROR) {
         game_destroy(playout);
@@ -311,6 +308,73 @@ static void MTCS_backpropagation(node_t* selected_old_leaf) {
  * @param selected_col the move that has been played in [0, 6]. Is assumed to be valid
 */
 static void progress_in_tree(col_t selected_col) {
+    /* 
+    This next section fetches simulations results from the branches not chosen 
+    and uses them to increment selected_col's simulations data.
+    For example, if selected_col == C, 
+    then the simulations data of "tree_root -> Y -> X -> C" (for any X, Y, C are all different)
+    can be used into the simulations data of "tree_root -> C -> X -> Y"
+    (different moves order, same grid state at the end).
+    That way, we reduce the number of new simulations to compute starting from "tree_root -> C"
+    */
+    col_t c = selected_col;    // For shorter notations in this section
+    for (col_t y = 0; y < ROW_LENGTH; y++) {
+        if (y == c || tree_root->children[y] == NULL) continue;
+        for (col_t x = 0; x < ROW_LENGTH; x++) {
+
+            // Ignore Y-X pair if invalid Y-X-C trio or if no data for "tree_root -> Y -> X -> C"
+
+            if (    x == y 
+                    || x == c 
+                    || tree_root->children[y]->children[x] == NULL
+                    || tree_root->children[y]->children[x]->children[c] == NULL
+            ) continue;
+
+            uint32_t merged_nb_wins = tree_root->children[y]->children[x]->children[c]->nb_wins;
+            uint32_t merged_nb_visits = tree_root->children[y]->children[x]->children[c]->nb_visits;
+
+            // If no data yet for the C-X-Y trio, try creating the appropriate nodes. Ignore C-X-Y trio if it fails
+            node_t* prnt = tree_root;    // parent node
+            uint8_t does_node_cxy_exist = 1;    // boolean to ensure that the node "tree_root -> C -> X -> Y" exists 
+            col_t chldrn[3] = {c, x, y};    // the indices of the sub-children to consider (in order) to reach "tree_root -> C -> X -> Y"
+            for (uint8_t i = 0; i < 3; i++) {
+                col_t idx = chldrn[i];    // the index of the child to create (if it does not already exist)
+                if (prnt->children[idx] != NULL) {
+                    // Node already exists
+                    prnt = prnt->children[idx];
+                    continue;    
+                }
+
+                // Attempt to create the new child node
+                node_t* child = create_node_and_simulate(play_copy_auto(prnt->state, idx), prnt);
+                if (child == NULL) {    
+                    // Node creation failed
+                    does_node_cxy_exist = 0;
+                    break;
+                }
+                prnt->children[idx] = child;
+
+                // Backpropagation of the data of the new child
+                for (node_t* n = prnt; n != NULL; n = n->parent) {
+                    n->nb_visits += child->nb_visits;
+                    n->nb_wins += child->nb_wins;
+                }
+                prnt = prnt->children[idx];
+            }
+            if (!does_node_cxy_exist) continue;    // Failed to create the node "tree_root -> C -> X -> Y"
+
+            /* Finally, adds the simulations data of "tree_root -> Y -> X -> C" to the data of "tree_root -> C -> X -> Y"
+            and backpropagates them */
+            nb_recombined_visits += merged_nb_visits;
+            for (node_t* node = tree_root->children[c]->children[x]->children[y]; node != NULL; node = node->parent) {
+                node->nb_visits += merged_nb_visits;
+                node->nb_wins += merged_nb_wins;
+            }
+            
+        }
+    }
+
+    // Actually rogressing into the tree
     node_t* selected_node = tree_root->children[selected_col];
     if (selected_node == NULL) selected_node = create_node_and_simulate(play_copy_auto(tree_root->state, selected_col), NULL);
     tree_root->children[selected_col] = NULL;
@@ -410,6 +474,7 @@ void destroy_MCTS() {
 col_t input_MCTS(col_t col) {
     if (col < 0 || col >= ROW_LENGTH) return ARG_ERROR;
     if (tree_root->children[col] == NULL) return -1;
+    nb_recombined_visits = 0;
     progress_in_tree(col);
 
     col_t col_to_play;
@@ -438,5 +503,8 @@ col_t input_MCTS(col_t col) {
 
 void print_state() {
     print_game(tree_root->state);
-    printf("=> Confidence : %.3f (%d visits)\n", (double) tree_root->nb_wins / (double) tree_root->nb_visits, tree_root->nb_visits);
+    printf("=> Confidence : %.1f %% (%d simulations, including %d merged)\n", 
+            100.0*(double) tree_root->nb_wins/(double) tree_root->nb_visits, 
+            tree_root->nb_visits, 
+            nb_recombined_visits);
 }
