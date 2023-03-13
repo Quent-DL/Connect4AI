@@ -9,7 +9,7 @@
  * @param w the player who won the game
 */
 static void terminate_game(game_t* game, player_t w) {
-    print_game(game);
+    print_state();
     game_destroy(game);
     destroy_MCTS();
     exit(0);

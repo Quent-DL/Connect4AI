@@ -7,7 +7,9 @@
 static player_t PLAYING_AS = PLAYER_B;
 static uint32_t MAX_VISITS = 20;    // one visit == one game simulation
 static node_t* tree_root = NULL;
-static uint32_t nb_recombined_visits = 0; 
+
+static uint32_t nb_recombined_visits = 0;    // for function print_state
+static col_t ai_choice = -1;    // for function print_state. -1 is only its init value
 
 /*
 ===========================================
@@ -206,7 +208,7 @@ static double compute_UCB(node_t* node) {
         // If now_playing != PLAYING_AS, that means the parent of node represents the turn of the AI.
         // Therefore, 'node' should have a great score if it maximises the w/n ratio.
         double ratio = (now_playing(node->state) != PLAYING_AS) ? w/n : 1-w/n;
-        return ratio + sqrt(2*log(N)/n);
+        return ratio + 0.9 * sqrt(2*log(N)/n);
     }
     else return 0.0;    // empty MTCS tree or leaf with error during first simulation (during the node creation)
 }
@@ -417,7 +419,7 @@ static col_t MCTS() {
     }
     if (selected_col == -1) return MCTS_FAIL;
     
-    printf("<<<<< %d visits of root node before progression >>>>>\n", tree_root->nb_visits);   // DEBUG DEBUG DEBUG
+    printf("\n<<<<< %d visits of root node before progression >>>>>\n", tree_root->nb_visits);   // DEBUG DEBUG DEBUG
     return selected_col;
 }
 
@@ -460,6 +462,7 @@ col_t init_MCTS(player_t playing_as, uint32_t max_visits) {
     if (playing_as == PLAYER_A) {
         col_t first_move = MCTS();
         progress_in_tree(first_move);
+        ai_choice = first_move;
         return first_move;
     }
     else return ROW_LENGTH;    // implicit playing_as == PLAYER_B
@@ -484,6 +487,7 @@ col_t input_MCTS(col_t col) {
     if (col_to_play >= 0) {
         progress_in_tree(col_to_play);
         MCTS();
+        ai_choice = col_to_play;
         return col_to_play;
     }
     // If the human is threatening to make a connect4, and the AI absolutely needs to avert it
@@ -491,17 +495,25 @@ col_t input_MCTS(col_t col) {
     if (col_to_play >= 0) {
         progress_in_tree(col_to_play);
         MCTS();
+        ai_choice = col_to_play;
         return col_to_play;
     }
 
     // Else, the AI is not forced to play any column, so it runs the MCTS to decide its next turn.
     col_to_play = MCTS();
     progress_in_tree(col_to_play);
+    ai_choice = col_to_play;
     return col_to_play;
 }
 
 
 void print_state() {
+    // To display the last column chosen by the AI
+    printf("\n");
+    if (ai_choice >= 0) {
+        printf("%*s* %*s\n", 2*ai_choice, "", 2*(ROW_LENGTH-ai_choice), "");
+    }
+
     print_game(tree_root->state);
     printf("=> Confidence : %.1f %% (%d simulations, including %d merged)\n", 
             100.0*(double) tree_root->nb_wins/(double) tree_root->nb_visits, 

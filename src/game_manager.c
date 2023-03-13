@@ -221,7 +221,6 @@ game_t* play_copy_auto(game_t* game, col_t col) {
 
 
 void print_game(game_t* game) {
-    printf("\n[GAME STATE]\n\n");
     printf("0 1 2 3 4 5 6\n");
     for(int8_t r = COL_HEIGHT-1; r >= 0; r--) {
         for (col_t c = 0; c < ROW_LENGTH; c++) {
@@ -230,30 +229,29 @@ void print_game(game_t* game) {
             if (game->gridA & (BIT_ONE<<offset)) printf("● ");
             else if (game->gridB & (BIT_ONE<<offset)) printf("○ ");
             else printf("_ ");
-            //printf("%c ", disk);
         }
         printf("\n");
     }
-    if (game->gridA & TURN_BIT) printf("\n=== Turn : A (●)\n");
-    else if (game->gridB & TURN_BIT) printf("\n=== Turn : B (○)\n");
-    else printf("\n=== TURN : ERROR\n");
 
     player_t w = winner(game);
-    char* outcome;
+    char* msg;
     switch (w) {
         case PLAYER_A:
-            outcome = "A has won !!!";
+            msg = "\n=== Outcome : A (●) has won !!!\n";
             break;
         case PLAYER_B:
-            outcome = "B has won !!!";
+            msg = "\n=== Outcome : B (○) has won !!!\n";
             break;
         case DRAW:
-            outcome = "The game is a draw !!!";
+            msg = "\n=== Outcome : The game is a draw !!!\n";
             break;
         default:
-            outcome = "_";
+            // Game not finished : still playing ===> need to display whose turn it is
+            if (game->gridA & TURN_BIT) msg = "\n=== Turn : A (●)\n";
+            else if (game->gridB & TURN_BIT) msg = "\n=== Turn : B (○)\n";
+            else msg = "\n=== TURN : ERROR\n";
     }
-    printf("=== Outcome : %s\n", outcome);
+    printf("%s", msg);
 
     printf("\n");
 }
